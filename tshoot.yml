@@ -1,0 +1,68 @@
+---
+- hosts: web
+  become: yes
+  tasks:
+  - block:
+      - name: install git
+        dnf: 
+          name: 
+            - git
+            - php
+            - nginx
+            - php-fpm
+          state: present
+
+      - name: selinux
+        shell: sed -i "s/SELINUX=enforcing/SELINUX=disabled/g" /etc/selinux/config
+
+      - name: stop firewalld
+        shell: |
+          systemctl disable --now firewalld
+          setenforce 0 
+
+      - name: download php site
+        git:
+          repo: 'https://github.com/php/web-qa.git'
+          dest: /home/ansible/website
+
+      - name: copy task.conf
+        copy:
+          src: ./nginx.conf
+          dest: /etc/nginx/nginx.conf
+    when: inventory_hostname == 'CentOS8'  
+
+  - block:
+      - name: install git
+        apt: 
+          name: 
+            - git
+            - php
+            - nginx
+            - php-fpm
+          state: latest
+
+      - name: download php site
+        git:
+          repo: 'https://github.com/php/web-qa.git'
+          dest: /home/ansible/website
+
+      - name: copy task.conf
+        copy:
+          src: ./default
+          dest: /etc/nginx/sites-enabled/default
+    when: inventory_hostname == 'Debian10'  
+
+  - name: www
+    copy:
+      src: ./www.key
+      dest: /opt
+
+  - name: www.pem
+    copy:
+      src: ./www.pem
+      dest: /opt
+
+  - name: restart nginx
+    service:
+      name: nginx
+      state: restarted
